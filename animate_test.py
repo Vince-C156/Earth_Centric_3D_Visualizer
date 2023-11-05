@@ -2,7 +2,7 @@ import sys
 import numpy as np
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import QTimer
-
+import pyvista
 from graphics import RenderRPO 
 
 def generate_orbital_trajectory(semi_major_axis, eccentricity, num_points):
@@ -48,11 +48,10 @@ render_rpo_instance = RenderRPO()
 render_rpo_instance.pl.show()
 # Setup a timer to update the position
 timer = QTimer()
-timer.setInterval(1000 // 30)  # Update frequency, here it's set for 30 Hz
+timer.setInterval(1000 / 30)  # Update frequency, here it's set for 30 Hz
 
 index = 0  # To keep track of the current position in the trajectory
 def update_position():
-    global index
     render_rpo_instance.set_chaser_position(trajectory[index])
     render_rpo_instance.focus_on_chaser()
     render_rpo_instance.update_scene()  # Trigger a repaint which should call update_scene internally

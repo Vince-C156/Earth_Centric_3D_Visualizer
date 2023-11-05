@@ -155,7 +155,7 @@ class RenderRPO:
         :param update_freq: Frequency of updates in Hz
         """
         # Calculate the update interval from the frequency
-        update_interval = round(1000 / update_freq) 
+        update_interval = round(1000 // update_freq) 
 
         # Start the animation using a timer
         timer_id = self.pl.app.startTimer(1000 * update_interval)  # interval in milliseconds
