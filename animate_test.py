@@ -33,8 +33,8 @@ def generate_orbital_trajectory(semi_major_axis, eccentricity, num_points):
     return np.array(orbit_points)
 
 # Parameters for the orbit
-semi_major_axis = 7000  # km, for example
-eccentricity = 0.01  # nearly circular
+semi_major_axis = 8000  # km, for example
+eccentricity = 0.2  # nearly circular
 num_points = 360  # number of points in the trajectory
 
 # Generate the orbital trajectory points
@@ -48,10 +48,11 @@ render_rpo_instance = RenderRPO()
 render_rpo_instance.pl.show()
 # Setup a timer to update the position
 timer = QTimer()
-timer.setInterval(1000 / 30)  # Update frequency, here it's set for 30 Hz
+timer.setInterval(1000 // 30)  # Update frequency, here it's set for 30 Hz
 
 index = 0  # To keep track of the current position in the trajectory
 def update_position():
+    global index
     render_rpo_instance.set_chaser_position(trajectory[index])
     render_rpo_instance.focus_on_chaser()
     render_rpo_instance.update_scene()  # Trigger a repaint which should call update_scene internally
