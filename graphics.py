@@ -14,6 +14,10 @@ class RenderRPO:
 
         self.chaser_stl_path, self.target_stl_path = 'models/DART_STL.stl', 'models/DART_STL.stl'
         self.pl, self.earth, self.chaser_mesh, self.target_mesh = self._BuildScene()
+        self.chaser_sphere = pyvista.Sphere(radius=250, center=self.chaser_mesh.center)
+        self.chaser_sphere_actor = self.pl.add_mesh(self.chaser_sphere, color='red')
+
+
         self.light = self._set_light_position_by_date(datetime.datetime.now())
         self.pl.add_light(self.light)
 
@@ -25,7 +29,9 @@ class RenderRPO:
         self.earthaxis.GetYAxisCaptionActor2D().GetCaptionTextProperty().SetColor((0, 1, 0))  # Green for Y
         self.earthaxis.GetZAxisCaptionActor2D().GetCaptionTextProperty().SetColor((0, 0, 1)) 
         
-        self.pl.add_axes()
+        #self.pl.add_axes()
+        #self._initaxes()
+        self.pl.add_axes(color='white')
 
 
         print('Building scene...')
@@ -88,52 +94,64 @@ class RenderRPO:
         print(f'The chaser is {self._distanceFromEarthSurface(self.chaser_mesh.center)} km from the surface of the Earth.')
 
     def focus_on_chaser(self):
-        # Ensure that the mesh is valid
+        # Ensure that the mesh is valid and has points to focus on
         if self.chaser_mesh.n_points == 0:
             print("Chaser mesh has no points, check the STL file.")
             return
 
-        # Calculate the center of the chaser satellite
+        # Calculate the center of the chaser mesh
         chaser_center = self.chaser_mesh.center
-        print(f"Chaser center: {chaser_center}")  # Debug info
 
-        # Calculate the direction vector from the Earth's center to the chaser
-        earth_center = [0, 0, 0]  # Assuming Earth's center is at the origin
-        direction_vector = [chaser_center[i] - earth_center[i] for i in range(3)]
+        # Calculate the appropriate distance from the chaser for the camera
+        # This ensures that the chaser is within the camera's field of view
+        distance_factor = 2.5
+        distance_from_surface = self._distanceFromEarthSurface(chaser_center)
+        if distance_from_surface < 0:
+            print("Chaser is below the surface of the Earth. Adjusting distance to a positive value.")
+            distance_from_surface = abs(distance_from_surface)
 
-        # Set a closer distance from the chaser for the camera
-        distance_factor = 1.5  # You may need to adjust this to ensure the Earth is behind the camera
-        distance = self.chaser_mesh.length * distance_factor
+        # Add some altitude to the camera position to make sure it's above the chaser
+        camera_altitude = (distance_from_surface + self.chaser_mesh.length) * distance_factor
 
-        # Set the camera position further back along the direction vector
-        camera_position = [chaser_center[i] + distance * direction_vector[i] for i in range(3)]
+        # Calculate the direction vector for camera placement
+        # This vector should point from the chaser's center to the camera
+        earth_center = np.array(self.earth.center)
+        direction_vector = chaser_center - earth_center
+        direction_vector = direction_vector / np.linalg.norm(direction_vector)  # Normalize the vector
+
+        # Now we calculate the camera position
+        camera_position = chaser_center + camera_altitude * direction_vector
 
         # The focal point is the chaser's center
         focal_point = chaser_center
 
-        # Define the view up vector
-        view_up = [0, 0, 1]  # Assuming the Z-axis is up
+        # Define the view up vector perpendicular to the direction_vector
+        # This is a bit tricky as we need to ensure that the view up vector is indeed perpendicular
+        # A simple cross product with another vector not aligned with direction_vector can give us a good approximation
+        temp_vector = np.array([1, 0, 0]) if direction_vector[0] == 0 else np.array([0, 1, 0])
+        view_up = np.cross(direction_vector, temp_vector)
+        view_up = view_up / np.linalg.norm(view_up)  # Normalize the vector
 
-        # Debug info
-        print(f"Camera position: {camera_position}")
-        print(f"Focal point: {focal_point}")
-        print(f"View up: {view_up}")
+        print(f'Camera Position: {camera_position}')
+        print(f'Chaser Center: {chaser_center}')
+        print(f'Focal Point: {focal_point}')
+        print(f'View Up Vector: {view_up}')
 
         # Update the camera settings
         self.pl.camera_position = [camera_position, focal_point, view_up]
         self.pl.reset_camera()
-        self.pl.update()
 
-        # Debug: Add a sphere at the chaser center to check visibility
-        self.pl.add_mesh(
-            pyvista.Sphere(radius=250, center=chaser_center),
-            color='red',  # Red color
-            opacity=0.5       # Semi-transparent
-        )
+        self.pl.remove_actor(self.chaser_sphere_actor)
+
+        self.chaser_sphere = pyvista.Sphere(radius=250, center=self.chaser_mesh.center)
+        self.chaser_sphere_actor = self.pl.add_mesh(self.chaser_sphere, color='red')
+        self.pl.update()
+        self.pl.render()
+
 
     def animate(self, update_freq=30):
         """
-        Animates the movement of the chaser and the target.
+        Animates the movement of the chaser and the target.`
         :param update_freq: Frequency of updates in Hz
         """
         # Calculate the update interval from the frequency
@@ -144,7 +162,7 @@ class RenderRPO:
         self.pl.app.timerEvent = self.update_scene
         self.timer_count = 0
 
-    def update_scene(self, event):
+    def update_scene(self, event = None):
         """
         This method is called by the Qt timer at each interval.
         Here you can update the position of the chaser and target meshes.
@@ -155,7 +173,12 @@ class RenderRPO:
         #self.set_chaser_position(chaser_position_eci)
 
         # Redraw the plotter
-        self.pl.update()
+
+        translation = np.array(self.chaser_mesh.center) - np.array(self.chaser_sphere.center)
+        self.chaser_sphere.translate(translation)
+        #self.pl.add_mesh(self.chaser_sphere, color='red')
+
+
         self.pl.render()
 
         # Increment the counter or compute the new position based on time
